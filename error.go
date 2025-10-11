@@ -3,8 +3,10 @@ package persist
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"reflect"
 	"strings"
+	"time"
 )
 
 // ErrorType 是一个无符号 64 位的错误代码.
@@ -98,6 +100,35 @@ func (msg *Error) Unwrap() error {
 	return msg.Err
 }
 
+// Println 根据错误类型打印带颜色的错误信息.
+func (msg *Error) Println(out io.Writer) {
+	if out == nil {
+		out = DefaultErrorWriter
+	}
+
+	// 创建日志格式化参数
+	params := LogFormatterParams{
+		TimeStamp: time.Now(),
+		Error:     msg,
+		isTerm:    true,
+		Keys:      make(map[any]any),
+	}
+
+	// 获取错误类型对应的颜色
+	colorCode := params.ErrorTypeColor()
+	resetCode := params.ResetColor()
+
+	// 格式化并打印错误信息
+	errorMsg := fmt.Sprintf("%s[%s] %s - %s%s\n",
+		colorCode,
+		getErrorTypeName(msg.Type),
+		timeFormat(params.TimeStamp),
+		msg.Error(),
+		resetCode)
+
+	fmt.Fprint(out, errorMsg)
+}
+
 // ByType 根据错误类型过滤错误信息.
 func (a ErrorMsg) ByType(typ ErrorType) ErrorMsg {
 	if len(a) == 0 {
@@ -174,4 +205,19 @@ func (a ErrorMsg) String() string {
 	}
 
 	return buffer.String()
+}
+
+// Println 打印错误消息切片，每个错误根据类型显示不同颜色.
+func (a ErrorMsg) Println(out io.Writer) {
+	if out == nil {
+		out = DefaultErrorWriter
+	}
+
+	for i, err := range a {
+		fmt.Fprintf(out, "Error #%02d: ", i+1)
+		PrintErrorWithColor(err, out)
+		if err.Meta != nil {
+			fmt.Fprintf(out, "     Meta: %v\n", err.Meta)
+		}
+	}
 }

@@ -1,7 +1,6 @@
 package persist
 
 import (
-	"fmt"
 	"io"
 	"time"
 )
@@ -80,50 +79,6 @@ func (p *LogFormatterParams) ErrorTypeColor() string {
 // ResetColor 返回重置颜色的代码.
 func (p *LogFormatterParams) ResetColor() string {
 	return reset
-}
-
-// PrintErrorWithColor 根据错误类型打印带颜色的错误信息.
-func PrintErrorWithColor(err *Error, out io.Writer) {
-	if out == nil {
-		out = DefaultErrorWriter
-	}
-
-	// 创建日志格式化参数
-	params := LogFormatterParams{
-		TimeStamp: time.Now(),
-		Error:     err,
-		isTerm:    true,
-		Keys:      make(map[any]any),
-	}
-
-	// 获取错误类型对应的颜色
-	colorCode := params.ErrorTypeColor()
-	resetCode := params.ResetColor()
-
-	// 格式化并打印错误信息
-	errorMsg := fmt.Sprintf("%s[%s] %s - %s%s\n",
-		colorCode,
-		getErrorTypeName(err.Type),
-		timeFormat(params.TimeStamp),
-		err.Error(),
-		resetCode)
-
-	fmt.Fprint(out, errorMsg)
-}
-
-// PrintErrorMsgWithColor 打印错误消息切片，每个错误根据类型显示不同颜色.
-func PrintErrorMsgWithColor(errors ErrorMsg, out io.Writer) {
-	if out == nil {
-		out = DefaultErrorWriter
-	}
-
-	for i, err := range errors {
-		fmt.Fprintf(out, "Error #%02d: ", i+1)
-		PrintErrorWithColor(err, out)
-		if err.Meta != nil {
-			fmt.Fprintf(out, "     Meta: %v\n", err.Meta)
-		}
-	}
 }
 
 // getErrorTypeName 根据错误类型返回对应的名称.
