@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"encoding/json/v2"
+	"encoding/json"
 
 	"github.com/spelens-gud/persist"
 )
@@ -79,7 +79,7 @@ func TestError_IsType(t *testing.T) {
 		},
 		{
 			name:      "combined flags match",
-			errType:   persist.ErrorTypePublic | persist.ErrorTypeBind,
+			errType:   persist.ErrorTypePublic | persist.ErrorTypeOp,
 			checkType: persist.ErrorTypePublic,
 			expected:  true,
 		},
@@ -232,8 +232,8 @@ func TestErrorMsg_ByType(t *testing.T) {
 	errs := persist.ErrorMsg{
 		&persist.Error{Err: errors.New("error1"), Type: persist.ErrorTypePublic},
 		&persist.Error{Err: errors.New("error2"), Type: persist.ErrorTypePrivate},
-		&persist.Error{Err: errors.New("error3"), Type: persist.ErrorTypePublic | persist.ErrorTypeBind},
-		&persist.Error{Err: errors.New("error4"), Type: persist.ErrorTypeRender},
+		&persist.Error{Err: errors.New("error3"), Type: persist.ErrorTypePublic | persist.ErrorTypeOp},
+		&persist.Error{Err: errors.New("error4"), Type: persist.ErrorTypeLoad},
 	}
 
 	tests := []struct {
@@ -253,7 +253,7 @@ func TestErrorMsg_ByType(t *testing.T) {
 		},
 		{
 			name:     "bind errors",
-			typ:      persist.ErrorTypeBind,
+			typ:      persist.ErrorTypeOp,
 			expected: 1,
 		},
 		{
@@ -263,7 +263,7 @@ func TestErrorMsg_ByType(t *testing.T) {
 		},
 		{
 			name:     "render errors",
-			typ:      persist.ErrorTypeRender,
+			typ:      persist.ErrorTypeLoad,
 			expected: 1,
 		},
 	}
