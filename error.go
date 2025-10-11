@@ -11,10 +11,12 @@ import (
 type ErrorType uint64
 
 const (
-	// ErrorTypeBind bind 用于 Context.Bind() 失败时.
-	ErrorTypeBind ErrorType = 1 << 63
-	// ErrorTypeRender render 用于 Context.Render() 失败时.
-	ErrorTypeRender ErrorType = 1 << 62
+	// ErrorTypeState 状态错误.
+	ErrorTypeState ErrorType = 1 << 63
+	// ErrorTypeLoad 加载错误.
+	ErrorTypeLoad ErrorType = 1 << 62
+	// ErrorTypeOp 操作错误.
+	ErrorTypeOp ErrorType = 1 << 61
 	// ErrorTypePrivate 私有错误.
 	ErrorTypePrivate ErrorType = 1 << 0
 	// ErrorTypePublic 公共错误.
