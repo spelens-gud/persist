@@ -1,51 +1,175 @@
 package persist
 
+import (
+	"encoding/json"
+	"fmt"
+	"reflect"
+	"strings"
+)
+
+// ErrorType 是一个无符号 64 位的错误代码.
 type ErrorType uint64
 
 const (
-	// ErrorTypeBind 绑定错误
+	// ErrorTypeBind bind 用于 Context.Bind() 失败时.
 	ErrorTypeBind ErrorType = 1 << 63
-	// ErrorTypeRender 读错误
+	// ErrorTypeRender render 用于 Context.Render() 失败时.
 	ErrorTypeRender ErrorType = 1 << 62
-	// ErrorTypePrivate 私有错误
+	// ErrorTypePrivate 私有错误.
 	ErrorTypePrivate ErrorType = 1 << 0
-	// ErrorTypePublic 公有错误
+	// ErrorTypePublic 公共错误.
 	ErrorTypePublic ErrorType = 1 << 1
-	ErrorTypeAny    ErrorType = 1<<64 - 1
+	// ErrorTypeAny 任何其他错误.
+	ErrorTypeAny ErrorType = 1<<64 - 1
 )
 
+// Error 表示错误的规范.
 type Error struct {
-	Err  error
-	Type ErrorType
-	Meta any
+	Err  error     // Err 是底层的错误.
+	Type ErrorType // Type 是错误的类型.
+	Meta any       // Meta 是与错误相关的任何元数据.
 }
 
-type errorMsg []*Error
-type PersistError string
+// ErrorMsg 是错误的切片.
+type ErrorMsg []*Error
 
-func (e PersistError) Error() string { return string(e) }
+// H 是一个方便的 map[string]any 别名.
+type H map[string]any
 
-const ELoadPollingTimeOut = 5
-const EMarshalFlagPoint uint8 = 0b00000001
-const EMarshalFlagBitSet uint8 = 0b10000000
+// 确保 Error 实现了 error 接口.
+var _ error = (*Error)(nil)
 
-const EPersistStateDisk = 0
-const EPersistStateLoading = 1
-const EPersistStateMemory = 2
-const EPersistStatePrepareUnloading = 3
-const EPersistStateUnloading = 4
+// SetType 设置错误的类型.
+func (msg *Error) SetType(flags ErrorType) *Error {
+	msg.Type = flags
 
-const EPersistErrorEngineNil = PersistError("persist: engine is nil")           // 启动关闭错误: 数据库连接失败
-const EPersistErrorTempFileExist = PersistError("persist: temp file exist")     // 启动关闭错误: 存在临时bomb文件
-const EPersistErrorInvalidBombFile = PersistError("persist: invalid bomb file") // 启动关闭错误: 无效的bomb文件
-const EPersistErrorUnknownError = PersistError("persist: unknown error")        // 导入导出错误: 未知错误, 可能是并发引起
-const EPersistErrorIncorrectState = PersistError("persist: incorrect state")    // 导入导出错误: 重复全导入或正在全导出
-const EPersistErrorUnloading = PersistError("persist: unloading state")         // 导入导出错误: 正在导出, 导出完成后方可导入
-const EPersistErrorAlreadyLoadAll = PersistError("persist: already load all")   // 导入导出错误: 已经全导入不能再按照key操作
-const EPersistErrorLoading = PersistError("persist: loading state")             // 导入导出错误: 正在导入, 导入完成后方可导出
-const EPersistErrorAlreadyLoad = PersistError("persist: already load")          // 导入导出错误: 重复导入
-const EPersistErrorAlreadyUnload = PersistError("persist: already unload")      // 导入导出错误: 重复导出
-const EPersistErrorNil = PersistError("persist: nil")                           // 增删改查错误: 非法的内存地址或空指针
-const EPersistErrorAlreadyExist = PersistError("persist: already exist")        // 增删改查错误: 对象已经存在
-const EPersistErrorNotInMemory = PersistError("persist: not in memory")         // 增删改查错误: 数据不在内存中
-const EPersistErrorOutOfDate = PersistError("persist: out of date")             // 增删改查错误: 数据过期, 应当重新查询
+	return msg
+}
+
+// SetMeta 设置错误的元数据.
+func (msg *Error) SetMeta(data any) *Error {
+	msg.Meta = data
+
+	return msg
+}
+
+// JSON 创建一个适当格式化的 JSON.
+func (msg *Error) JSON() any {
+	jsonData := H{}
+	if msg.Meta != nil {
+		value := reflect.ValueOf(msg.Meta)
+		switch value.Kind() {
+		case reflect.Struct:
+			return msg.Meta
+		case reflect.Map:
+			for _, key := range value.MapKeys() {
+				jsonData[key.String()] = value.MapIndex(key).Interface()
+			}
+		default:
+			jsonData["meta"] = msg.Meta
+		}
+	}
+	if _, ok := jsonData["error"]; !ok {
+		jsonData["error"] = msg.Error()
+	}
+
+	return jsonData
+}
+
+// MarshalJSON 返回错误的 JSON 编码.
+func (msg *Error) MarshalJSON() ([]byte, error) {
+	return json.Marshal(msg.JSON())
+}
+
+// Error 实现 error 接口.
+func (msg *Error) Error() string {
+	return msg.Err.Error()
+}
+
+// IsType 检查错误类型是否与提供的标志匹配.
+func (msg *Error) IsType(flags ErrorType) bool {
+	return (msg.Type & flags) > 0
+}
+
+// Unwrap 返回底层错误.
+func (msg *Error) Unwrap() error {
+	return msg.Err
+}
+
+// ByType 根据错误类型过滤错误信息.
+func (a ErrorMsg) ByType(typ ErrorType) ErrorMsg {
+	if len(a) == 0 {
+		return nil
+	}
+	if typ == ErrorTypeAny {
+		return a
+	}
+	var result ErrorMsg
+	for _, msg := range a {
+		if msg.IsType(typ) {
+			result = append(result, msg)
+		}
+	}
+
+	return result
+}
+
+// Last 返回最后一个错误信息，如果没有错误则返回 nil.
+func (a ErrorMsg) Last() *Error {
+	if length := len(a); length > 0 {
+		return a[length-1]
+	}
+
+	return nil
+}
+
+// Errors 返回错误信息的字符串切片表示形式.
+func (a ErrorMsg) Errors() []string {
+	if len(a) == 0 {
+		return nil
+	}
+	errorStrings := make([]string, len(a))
+	for i, err := range a {
+		errorStrings[i] = err.Error()
+	}
+
+	return errorStrings
+}
+
+// JSON 对返回错误信息的 JSON 表示形式.
+func (a ErrorMsg) JSON() any {
+	switch length := len(a); length {
+	case 0:
+		return nil
+	case 1:
+		return a.Last().JSON()
+	default:
+		jsonData := make([]any, length)
+		for i, err := range a {
+			jsonData[i] = err.JSON()
+		}
+
+		return jsonData
+	}
+}
+
+// MarshalJSON 返回错误信息的 JSON 编码.
+func (a ErrorMsg) MarshalJSON() ([]byte, error) {
+	return json.Marshal(a.JSON())
+}
+
+// String 返回错误信息的字符串表示形式.
+func (a ErrorMsg) String() string {
+	if len(a) == 0 {
+		return ""
+	}
+	var buffer strings.Builder
+	for i, msg := range a {
+		fmt.Fprintf(&buffer, "Error #%02d: %s\n", i+1, msg.Err)
+		if msg.Meta != nil {
+			fmt.Fprintf(&buffer, "     Meta: %v\n", msg.Meta)
+		}
+	}
+
+	return buffer.String()
+}
