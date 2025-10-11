@@ -77,7 +77,7 @@ func ReturnError(logger *log.Logger, err any) (errorOutput string) {
 	if logger != nil {
 		const stackSkip = 3 // 跳过调用栈的前 3 帧
 		logger.Printf("[Recovery] %s panic recovered:\n%s\n%s%s",
-			timeFormat(time.Now()), errorOutput, stack(stackSkip), reset)
+			timeFormat(time.Now()), errorOutput, stack(stackSkip), "\033[0m")
 	}
 
 	return
