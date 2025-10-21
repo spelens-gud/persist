@@ -38,6 +38,7 @@ func CustomRecoveryWithWriter(out io.Writer, handle RecoveryFunc) func() {
 	var logger *log.Logger
 	if out != nil {
 		logger = log.New(out, "\n\n\x1b[31m", log.LstdFlags)
+		logger.SetOutput(out)
 	}
 
 	return func() {

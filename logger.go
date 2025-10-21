@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+// 颜色日志输出模块
+
 // consoleColorModeValue 打印日志时的颜色模式.
 type consoleColorModeValue int
 

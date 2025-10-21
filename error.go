@@ -213,11 +213,7 @@ func (a ErrorMsg) Println(out io.Writer) {
 		out = DefaultErrorWriter
 	}
 
-	for i, err := range a {
-		fmt.Fprintf(out, "Error #%02d: ", i+1)
-		PrintErrorWithColor(err, out)
-		if err.Meta != nil {
-			fmt.Fprintf(out, "     Meta: %v\n", err.Meta)
-		}
+	for _, err := range a {
+		err.Println(out)
 	}
 }
